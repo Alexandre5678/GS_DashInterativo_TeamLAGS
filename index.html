@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prazo156 | Painel de espera dos chamados SP156</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f3f5fa;--card:#fff;--text:#1d2a4d;--muted:#5a6684;--line:#dde3ef;--teal:#0f9b8a;--pink:#d9154f;--soft:#e7f5f3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111833;--card:#1a2448;--text:#eef1fa;--muted:#a3aecb;--line:#2c3860;--teal:#2dd4bf;--pink:#ff5c8a;--soft:#173a4a}}
+:root[data-theme="dark"]{--bg:#111833;--card:#1a2448;--text:#eef1fa;--muted:#a3aecb;--line:#2c3860;--teal:#2dd4bf;--pink:#ff5c8a;--soft:#173a4a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Lato,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.45}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:900;margin:0 0 4px}
+h1 span{color:var(--pink)}
+.sub{color:var(--muted);margin:0 0 18px;max-width:70ch}
+#drop{border:2px dashed var(--teal);border-radius:14px;background:var(--soft);padding:34px 18px;text-align:center;cursor:pointer;transition:background .15s}
+#drop.over,#drop:focus-visible{background:var(--card);outline:3px solid var(--teal)}
+#drop strong{display:block;font-size:1.15rem;margin-bottom:4px}
+#drop small{color:var(--muted)}
+#err{color:var(--pink);font-weight:700;margin:10px 0 0;min-height:1.2em}
+#app{display:none}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:18px 0}
+.bar label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:3px;min-width:140px;flex:1 1 140px}
+select,button{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+button{cursor:pointer;font-weight:700}
+select:focus-visible,button:focus-visible{outline:3px solid var(--teal)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi b{display:block;font-size:1.9rem;font-weight:900;line-height:1.1}
+.kpi span{font-size:.85rem;color:var(--muted)}
+.kpi.t b{color:var(--teal)}.kpi.p b{color:var(--pink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:12px;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h2{font-size:1rem;margin:0 0 2px}
+.card p{font-size:.8rem;color:var(--muted);margin:0 0 8px}
+.cv{position:relative;height:300px}
+.note{font-size:.8rem;color:var(--muted);margin-top:16px;max-width:90ch}
+</style>
+</head>
+<body>
+<main>
+<h1>Prazo<span>156</span> | Painel de espera dos chamados</h1>
+<p class="sub">Arraste o arquivo CSV da base agregada do SP156 para montar o painel. Os dados são lidos no seu navegador e não são enviados a nenhum servidor.</p>
+
+<div id="drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar o arquivo CSV">
+<strong>Solte o CSV aqui ou clique para escolher</strong>
+<small>GS_2TSCPW_DataViz_Prazo156_TeamLAGS.csv (separador ponto e vírgula ou vírgula)</small>
+<input type="file" id="file" accept=".csv,text/csv,text/plain" hidden>
+</div>
+<p id="err" role="alert"></p>
+
+<section id="app">
+<div class="bar">
+<label>De<select id="fFrom"></select></label>
+<label>Até<select id="fTo"></select></label>
+<label>Subprefeitura<select id="fSub"></select></label>
+<label>Tema<select id="fTema"></select></label>
+<label>Canal<select id="fCanal"></select></label>
+<button id="reset" type="button">Limpar filtros</button>
+</div>
+
+<div class="kpis">
+<div class="kpi"><b id="k1">-</b><span>chamados no recorte</span></div>
+<div class="kpi t"><b id="k2">-</b><span>resolvidos em até 30 dias</span></div>
+<div class="kpi p"><b id="k3">-</b><span>chamados ainda em aberto</span></div>
+<div class="kpi"><b id="k4">-</b><span>tempo médio dos finalizados (dias)</span></div>
+</div>
+
+<div class="grid">
+<div class="card"><h2>Evolução: % resolvido em até 30 dias</h2><p>Por mês de abertura. Os meses mais recentes têm menos tempo de observação.</p><div class="cv"><canvas id="cB" role="img" aria-label="Linha com o percentual resolvido em 30 dias por mês"></canvas></div></div>
+<div class="card"><h2>Subprefeituras abaixo do esperado (p.p.)</h2><p>Observado menos esperado para o mix de temas. Clique em uma barra para filtrar.</p><div class="cv"><canvas id="cC" role="img" aria-label="Barras das subprefeituras com maior diferença negativa para o esperado"></canvas></div></div>
+<div class="card"><h2>Temas mais lentos (% em 30 dias)</h2><p>Temas com pelo menos 3 mil chamados no recorte.</p><div class="cv"><canvas id="cD" role="img" aria-label="Barras dos temas com menor percentual resolvido em 30 dias"></canvas></div></div>
+<div class="card"><h2>Quem espera: temas dos chamados em aberto</h2><p>Participação de cada tema na fila em aberto.</p><div class="cv"><canvas id="cE" role="img" aria-label="Barras com a participação de cada tema nos chamados em aberto"></canvas></div></div>
+</div>
+<p class="note">Leitura: o esperado de cada subprefeitura é a taxa geral de cada tema aplicada ao mix de temas daquela subprefeitura. Assim a comparação desconta o tipo de serviço. Chamados cancelados e sem 30 dias de observação já foram tratados na geração do CSV. Subprefeituras com menos de 500 chamados no recorte ficam fora do ranking.</p>
+</section>
+</main>
+
+<script>
+(function(){
+var raw=[],charts={},$=function(i){return document.getElementById(i)};
+var NEED=["mes_abertura","subprefeitura","tema","canal","chamados","resolvidos_ate_30d","em_aberto","finalizados","soma_dias_finalizados"];
+var fmt=function(n){return Math.round(n).toLocaleString("pt-BR")};
+var pct=function(n){return n.toLocaleString("pt-BR",{maximumFractionDigits:1,minimumFractionDigits:1})+"%"};
+function num(v){var x=parseFloat(String(v).replace(",","."));return isNaN(x)?0:x}
+
+function parse(text){
+  text=text.replace(/^\uFEFF/,"");
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim()});
+  if(lines.length<2)throw new Error("O arquivo está vazio ou tem só o cabeçalho.");
+  var d=lines[0].indexOf(";")>-1?";":",";
+  var cut=function(l){return l.split(d).map(function(s){return s.trim().replace(/^"|"$/g,"")})};
+  var h=cut(lines[0]).map(function(s){return s.toLowerCase()});
+  var miss=NEED.filter(function(c){return h.indexOf(c)<0});
+  if(miss.length)throw new Error("Faltam colunas no CSV: "+miss.join(", ")+".");
+  var ix={};NEED.forEach(function(c){ix[c]=h.indexOf(c)});
+  var out=[];
+  for(var i=1;i<lines.length;i++){
+    var c=cut(lines[i]);
+    out.push({m:c[ix.mes_abertura],s:c[ix.subprefeitura]||"(sem subprefeitura)",t:c[ix.tema]||"(sem tema)",c:c[ix.canal]||"(sem canal)",
+      n:num(c[ix.chamados]),r:num(c[ix.resolvidos_ate_30d]),a:num(c[ix.em_aberto]),f:num(c[ix.finalizados]),d:num(c[ix.soma_dias_finalizados])});
+  }
+  return out;
+}
+
+function fill(sel,vals,allLabel){
+  sel.innerHTML="";
+  if(allLabel){var o=document.createElement("option");o.value="";o.textContent=allLabel;sel.appendChild(o)}
+  vals.forEach(function(v){var o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o)});
+}
+function uniq(k){var s={};raw.forEach(function(r){s[r[k]]=1});return Object.keys(s).sort()}
+
+function init(){
+  var ms=uniq("m");
+  fill($("fFrom"),ms);fill($("fTo"),ms);
+  fill($("fSub"),uniq("s"),"Todas");fill($("fTema"),uniq("t"),"Todos");fill($("fCanal"),uniq("c"),"Todos");
+  resetF();
+  $("app").style.display="block";
+}
+function resetF(){
+  var ms=uniq("m");
+  $("fFrom").value=ms[0];$("fTo").value=ms[ms.length-1];
+  $("fSub").value="";$("fTema").value="";$("fCanal").value="";
+  render();
+}
+
+function sum(rows,k){var s=0;for(var i=0;i<rows.length;i++)s+=rows[i][k];return s}
+function group(rows,k){var g={};rows.forEach(function(r){(g[r[k]]=g[r[k]]||[]).push(r)});return g}
+function col(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function mk(id,cfg){
+  if(charts[id])charts[id].destroy();
+  cfg.options=cfg.options||{};cfg.options.maintainAspectRatio=false;
+  charts[id]=new Chart($(id),cfg);
+}
+
+function render(){
+  if(!raw.length)return;
+  Chart.defaults.color=col("--muted");Chart.defaults.borderColor=col("--line");Chart.defaults.font.family="Lato,system-ui,sans-serif";
+  var from=$("fFrom").value,to=$("fTo").value,sub=$("fSub").value,tema=$("fTema").value,canal=$("fCanal").value;
+  if(from>to){var x=from;from=to;to=x}
+  var base=raw.filter(function(r){return r.m>=from&&r.m<=to&&(!tema||r.t===tema)&&(!canal||r.c===canal)});
+  var data=sub?base.filter(function(r){return r.s===sub}):base;
+  var n=sum(data,"n"),res=sum(data,"r"),ab=sum(data,"a"),fin=sum(data,"f"),dias=sum(data,"d");
+  $("k1").textContent=fmt(n);
+  $("k2").textContent=n?pct(res/n*100):"-";
+  $("k3").textContent=fmt(ab);
+  $("k4").textContent=fin?(dias/fin).toLocaleString("pt-BR",{maximumFractionDigits:1}):"-";
+  var teal=col("--teal"),pink=col("--pink"),text=col("--text");
+
+  // B: evolução mensal
+  var gm=group(data,"m"),ml=Object.keys(gm).sort();
+  var mv=ml.map(function(m){var s=sum(gm[m],"n");return s?+(sum(gm[m],"r")/s*100).toFixed(1):null});
+  var avg=n?res/n*100:0;
+  mk("cB",{type:"line",data:{labels:ml,datasets:[
+    {label:"% em 30 dias",data:mv,borderColor:teal,backgroundColor:teal,pointRadius:4,tension:.2},
+    {label:"Média do recorte",data:ml.map(function(){return +avg.toFixed(1)}),borderColor:col("--muted"),borderDash:[5,5],pointRadius:0}]},
+    options:{scales:{y:{suggestedMin:60,suggestedMax:100,ticks:{callback:function(v){return v+"%"}}}},plugins:{legend:{position:"bottom"}}}});
+
+  // C: observado - esperado (ignora filtro de subprefeitura)
+  var gt=group(base,"t"),rate={};
+  Object.keys(gt).forEach(function(t){var s=sum(gt[t],"n");rate[t]=s?sum(gt[t],"r")/s:0});
+  var gs=group(base,"s"),dif=[];
+  Object.keys(gs).forEach(function(s){
+    var N=sum(gs[s],"n");if(N<500)return;
+    var exp=0;gs[s].forEach(function(r){exp+=r.n*rate[r.t]});
+    dif.push({s:s,v:(sum(gs[s],"r")-exp)/N*100});
+  });
+  dif.sort(function(a,b){return a.v-b.v});dif=dif.slice(0,10);
+  mk("cC",{type:"bar",data:{labels:dif.map(function(d){return d.s}),datasets:[{data:dif.map(function(d){return +d.v.toFixed(1)}),
+    backgroundColor:dif.map(function(d){return d.s===sub?text:(d.v<0?pink:teal)})}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false}},
+      onClick:function(e,els){if(els.length){$("fSub").value=dif[els[0].index].s;render()}},
+      onHover:function(e,els){e.native.target.style.cursor=els.length?"pointer":"default"},
+      scales:{x:{ticks:{callback:function(v){return v+" p.p."}}},y:{ticks:{font:{size:10}}}}}});
+
+  // D: temas mais lentos
+  var gd=group(data,"t"),sl=[];
+  Object.keys(gd).forEach(function(t){var N=sum(gd[t],"n");if(N>=3000)sl.push({t:t,v:sum(gd[t],"r")/N*100})});
+  sl.sort(function(a,b){return a.v-b.v});sl=sl.slice(0,8);
+  mk("cD",{type:"bar",data:{labels:sl.map(function(d){return d.t}),datasets:[{data:sl.map(function(d){return +d.v.toFixed(1)}),backgroundColor:teal}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{max:100,ticks:{callback:function(v){return v+"%"}}}}}});
+
+  // E: fila em aberto por tema
+  var op=Object.keys(gd).map(function(t){return {t:t,v:sum(gd[t],"a")}}).sort(function(a,b){return b.v-a.v}).slice(0,6);
+  mk("cE",{type:"bar",data:{labels:op.map(function(d){return d.t}),datasets:[{data:op.map(function(d){return ab?+(d.v/ab*100).toFixed(1):0}),backgroundColor:text}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{callback:function(v){return v+"%"}}}}}});
+}
+
+function load(f){
+  $("err").textContent="";
+  if(!f)return;
+  var r=new FileReader();
+  r.onload=function(){try{raw=parse(String(r.result));init()}catch(e){raw=[];$("app").style.display="none";$("err").textContent=e.message}};
+  r.onerror=function(){$("err").textContent="Não foi possível ler o arquivo. Tente novamente."};
+  r.readAsText(f,"utf-8");
+}
+var drop=$("drop");
+drop.addEventListener("click",function(){$("file").click()});
+drop.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();$("file").click()}});
+$("file").addEventListener("change",function(e){load(e.target.files[0])});
+["dragenter","dragover"].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add("over")})});
+["dragleave","drop"].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove("over")})});
+drop.addEventListener("drop",function(e){load(e.dataTransfer.files[0])});
+["fFrom","fTo","fSub","fTema","fCanal"].forEach(function(i){$(i).addEventListener("change",render)});
+$("reset").addEventListener("click",resetF);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
+})();
+</script>
+</body>
+</html>
